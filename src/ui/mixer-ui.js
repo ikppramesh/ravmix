@@ -203,7 +203,10 @@ export class MixerUI {
 
   frame() {
     const e = this.engine;
-    this.strips.forEach((s) => s.meter.set(meterLevel(s.ch.meter, this.buf)));
+    this.strips.forEach((s, i) => {
+      s.meter.set(meterLevel(s.ch.meter, this.buf));
+      s.el.classList.toggle('ext', e.decks[i].isYT);
+    });
     this.mL.set(meterLevel(e.meterL, this.buf));
     this.mR.set(meterLevel(e.meterR, this.buf));
     const bpm = e.masterBpm;

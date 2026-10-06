@@ -76,7 +76,7 @@ export class ScrollingWave {
     const pxPerSec = W / this.zoom;
     const t0 = pos - this.zoom / 2;
     const wave = tr.wave;
-    const fps = wave.fps;
+    const fps = wave?.fps;
 
     // Loop region
     const lp = deck.loop;
@@ -105,6 +105,17 @@ export class ScrollingWave {
 
     // 3-band waveform (rekordbox style)
     const amp = mid * 0.92;
+    if (!wave) {
+      // YouTube decks: no audio access, so draw a plain timeline
+      const x0 = (0 - t0) * pxPerSec, x1 = (deck.duration - t0) * pxPerSec;
+      c.fillStyle = 'rgba(255,40,40,0.18)';
+      c.fillRect(Math.max(0, x0), mid - 2, Math.min(W, x1) - Math.max(0, x0), 4);
+      c.fillStyle = 'rgba(255,255,255,0.35)';
+      c.font = `${11 * (window.devicePixelRatio || 1)}px Inter, sans-serif`;
+      c.textAlign = 'center';
+      c.fillText('YouTube — waveform not available', W / 4, mid - 10);
+      c.textAlign = 'left';
+    } else {
     if (!this.cols || this.cols.length !== W * 3) this.cols = new Float32Array(W * 3);
     const cols = this.cols;
     cols.fill(0);
@@ -135,6 +146,7 @@ export class ScrollingWave {
         }
       }
     });
+    }
 
     // Cue + hot cue markers
     const marker = (t, color, label) => {
@@ -191,8 +203,13 @@ export class OverviewWave {
     off.height = H;
     const c = off.getContext('2d');
     const wave = this.deck.track.wave;
-    const n = wave.low.length;
     const mid = H / 2;
+    if (!wave) {
+      c.fillStyle = 'rgba(255,40,40,0.35)';
+      c.fillRect(0, mid - 2, W, 4);
+      return off;
+    }
+    const n = wave.low.length;
     for (let x = 0; x < W; x++) {
       const fa = Math.floor((x / W) * n);
       const fb = Math.max(fa + 1, Math.floor(((x + 1) / W) * n));
@@ -218,7 +235,7 @@ export class OverviewWave {
     const W = this.canvas.width, H = this.canvas.height;
     c.clearRect(0, 0, W, H);
     const deck = this.deck;
-    if (!deck.track) return;
+    if (!deck.track || !deck.duration) return;
     const key = `${deck.track.id}:${W}x${H}`;
     if (key !== this.cacheKey) {
       this.cache = this.buildCache(W, H);

@@ -301,3 +301,24 @@ kbd { font: 700 11px var(--mono); background: #0e0f13; border: 1px solid var(--e
   .btn.mode .btn-sub { font-size: 6.5px; }
   .loop-sec .row .btn { min-width: 0; }
 }
+
+/* ---------- YouTube ---------- */
+.yt-form { display: flex; gap: 6px; margin-left: auto; flex: 1; max-width: 520px; }
+.yt-input { flex: 1; min-width: 0; font: inherit; font-size: 12px; color: var(--text); background: #0e0f13; border: 1px solid var(--edge); border-radius: 5px; padding: 5px 8px; user-select: text; }
+.yt-input:focus { outline: none; border-color: #ff3b3b; }
+.yt-input.bad { border-color: #ff3b3b; animation: shake .25s; }
+@keyframes shake { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+.btn.yt-add { color: #ff5c5c; white-space: nowrap; }
+.btn.add { margin-left: 0; }
+.yt-badge { font: 800 9px Inter, sans-serif; color: #fff; background: #e62117; padding: 1px 5px; border-radius: 3px; }
+.yt-box, .yt-note { display: none; }
+.deck-display.is-yt .overview { height: 10px; }
+.deck-display.is-yt .yt-box { display: block; height: 200px; border-radius: 6px; overflow: hidden; background: #000; }
+.yt-box iframe { width: 100%; height: 100%; border: 0; display: block; }
+.deck-display.is-yt .yt-note { display: block; font-size: 10px; color: var(--muted); line-height: 1.35; }
+.f-yt { color: #ff5c5c; }
+.strip.ext .knob:not(:nth-child(2)), .strip.ext .meter, .strip.ext .cue-btn { opacity: .3; pointer-events: none; }
+@media (max-width: 760px) {
+  .lib-head { flex-wrap: wrap; }
+  .yt-form { order: 3; flex-basis: 100%; max-width: none; }
+}

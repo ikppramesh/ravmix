@@ -23,6 +23,9 @@ Press the power button, click **+ ADD SONGS** (or drag files onto the collection
 | Beat FX | Delay, Echo, Ping Pong, Spiral, Reverb, Trans, Filter, Flanger, Phaser, HPF/LPF sweep — beat-synced, BEAT ◀ ▶, channel 1/2/Master, LEVEL/DEPTH, ON |
 | Extras | Automatic BPM + beat grid, 3-band scrolling waveforms, Quantize, mix recording (REC → downloads file), keyboard shortcuts (press **H**) |
 
+### YouTube links
+Paste a YouTube link into **Paste a YouTube link… → ▶ ADD YOUTUBE** (or drag a link onto a deck) and load it like any song. It plays through YouTube's official embedded player, so the audio can't enter the mixer. On a YouTube deck you get play/cue, hot cues, loops, beat jump, tempo (YouTube rounds to 5% steps and keeps the key), and volume via trim/fader/crossfader/master. EQ, CFX, FX, scratching, waveform, BPM detection and headphone cue are not available. Double-click the BPM to enter it for BEAT SYNC. Videos whose owners disable embedding won't play.
+
 ### Headphone cueing
 ⚙ AUDIO → Headphones: *split cable* (L = cue, R = master), *controller outputs 3/4* (a real DDJ-FLX4 used as the sound card), or a *second output device*.
 

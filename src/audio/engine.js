@@ -230,6 +230,17 @@ export class Engine {
     return d.loaded && d.bpm ? d.effectiveBpm : 120;
   }
 
+  // YouTube decks bypass Web Audio, so mirror trim × fader × crossfader × master onto the player volume
+  syncExternalVolumes() {
+    this.decks.forEach((d, i) => {
+      if (!d.isYT || !d.yt) return;
+      const st = this.channels[i].state;
+      const trim = st.trim >= 0.5 ? 1 : Math.pow(st.trim * 2, 2);
+      const v = trim * Math.pow(st.fader, 1.6) * this.xfGains[i] * Math.min(1, Math.pow(this.state.master, 1.6) * 1.2);
+      d.yt.setVolume(v);
+    });
+  }
+
   // ---------- Mixer ----------
   setCrossfader(x) {
     this.state.crossfader = x;

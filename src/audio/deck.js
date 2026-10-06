@@ -1,5 +1,6 @@
 // Deck controller (main thread). Talks to the deck-processor worklet.
 import { FxUnit } from './fx.js';
+import { YouTubeSource } from './youtube.js';
 
 export const TEMPO_RANGES = [0.06, 0.1, 0.16, 1.0];
 export const HOTCUE_COLORS = ['#e9264f', '#ff8a00', '#ffd400', '#2fd16b', '#19c3ff', '#3b6bff', '#a64dff', '#ff4dd2'];
@@ -94,9 +95,21 @@ export class Deck {
   }
 
   // ---------- Track loading ----------
+  // A YouTube deck plays through the embedded player instead of the worklet
+  get isYT() {
+    return this.track?.kind === 'youtube';
+  }
+
+  transport(play) {
+    if (this.isYT) play ? this.yt.play() : this.yt.pause();
+    else this.post({ type: play ? 'play' : 'pause' });
+  }
+
   async load(track) {
     this.pause();
     const synced = this.synced;
+    if (track.kind === 'youtube') return this.loadYouTube(track, synced);
+    if (this.isYT) this.yt.stop();
     this.track = track;
     this.reset();
     this.synced = false;
@@ -115,6 +128,49 @@ export class Deck {
     this.post({ type: 'loop', on: false, s: 0, e: 0 });
     if (synced) this.syncToggle();
     this.emit();
+  }
+
+  async loadYouTube(track, synced) {
+    if (!this.ytHost) throw new Error('No video host for this deck');
+    this.yt ??= new YouTubeSource(this.ytHost);
+    this.yt.onEnded = () => {
+      this.playing = false;
+      this.synced = false;
+      this.emit();
+    };
+    // Silence the worklet (it may still hold the previous track)
+    this.post({ type: 'pause' });
+    this.post({ type: 'load', L: new Float32Array(1), R: null });
+    this.track = { ...track, duration: 0, loading: true };
+    this.reset();
+    this.emit();
+    let meta;
+    try {
+      meta = await this.yt.load(track.videoId);
+    } catch (err) {
+      this.track = null;
+      this.emit();
+      throw err;
+    }
+    this.track = {
+      ...track,
+      duration: meta.duration,
+      title: track.titleFromLink ? track.title : meta.title || track.title,
+      artist: track.artist || meta.artist || 'YouTube',
+    };
+    track.duration = meta.duration;
+    this.cuePoint = 0;
+    this.applyRate();
+    if (synced) this.syncToggle();
+    this.emit();
+    return this.track;
+  }
+
+  /** Called every animation frame: loops / slip for YouTube decks */
+  tick() {
+    if (!this.isYT || !this.playing) return;
+    const lp = this.loop;
+    if (lp.active && lp.out != null && this.position >= lp.out) this.seek(lp.in);
   }
 
   get loaded() {
@@ -151,6 +207,7 @@ export class Deck {
 
   // Current playhead position in seconds (extrapolated between worklet reports)
   get position() {
+    if (this.isYT) return Math.max(0, Math.min(this.duration || 0, this.yt.time));
     const r = this.rep;
     let p = r.pos + r.speed * this.sr * ((performance.now() - r.at) / 1000);
     if (this.loop.active && r.speed > 0 && this.loop.out > this.loop.in) {
@@ -178,6 +235,7 @@ export class Deck {
   seek(sec, opts = {}) {
     if (!this.loaded) return;
     sec = Math.max(0, Math.min(this.duration, sec));
+    if (this.isYT) return this.yt.seek(sec);
     this.post({ type: 'seek', pos: sec * this.sr, slipToo: opts.slipToo !== false });
     this.rep = { ...this.rep, pos: sec * this.sr, at: performance.now() };
   }
@@ -188,14 +246,14 @@ export class Deck {
     this.playing = true;
     this.cuePreview = false;
     this.hotPreview = -1;
-    this.post({ type: 'play' });
+    this.transport(true);
     if (this.synced) this.alignPhase();
     this.emit();
   }
 
   pause() {
     this.playing = false;
-    this.post({ type: 'pause' });
+    this.transport(false);
     this.emit();
   }
 
@@ -221,7 +279,7 @@ export class Deck {
       this.engine.resume();
       this.cuePreview = true;
       this.playing = true;
-      this.post({ type: 'play' });
+      this.transport(true);
     }
     this.emit();
   }
@@ -259,6 +317,7 @@ export class Deck {
   }
 
   applyRate() {
+    if (this.isYT) this.yt.setRate(this.rate);
     this.post({ type: 'rate', v: this.rate });
     this.engine.onTempoChange?.(this);
   }
@@ -280,6 +339,7 @@ export class Deck {
   }
 
   setKeyShift(st) {
+    if (this.isYT) return;
     this.keyShift = st;
     this.post({ type: 'pitch', v: Math.pow(2, st / 12) });
     this.emit();
@@ -327,7 +387,7 @@ export class Deck {
 
   // ---------- Jog ----------
   scratchStart() {
-    if (!this.loaded) return;
+    if (!this.loaded || this.isYT) return;
     this.engine.resume();
     this.post({ type: 'scratch', on: true });
   }
@@ -338,6 +398,7 @@ export class Deck {
     this.post({ type: 'scratch', on: false });
   }
   bend(amount) {
+    if (this.isYT) return;
     this.post({ type: 'bend', v: amount });
   }
   search(seconds) {
@@ -364,7 +425,7 @@ export class Deck {
       this.engine.resume();
       this.hotPreview = i;
       this.playing = true;
-      this.post({ type: 'play' });
+      this.transport(true);
     }
     this.emit();
   }
@@ -468,7 +529,7 @@ export class Deck {
   }
 
   padFxDown(def) {
-    if (!this.loaded) return;
+    if (!this.loaded || this.isYT) return;
     this.padFx.setBpm(this.effectiveBpm || 120);
     if (def.roll) {
       if (!this.playing) return;

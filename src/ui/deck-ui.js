@@ -64,12 +64,17 @@ export class DeckUI {
     this.tempoEl = h('div', { class: 'disp-tempo' }, '0.00%');
     this.flags = h('div', { class: 'disp-flags' });
     this.overview = h('canvas', { class: 'overview' });
+    this.ytBox = h('div', { class: 'yt-box' });
+    this.deck.ytHost = this.ytBox;
+    this.ytNote = h('div', { class: 'yt-note' }, 'YouTube deck: volume, crossfader, cues, loops & tempo work. EQ, FX, scratch, waveform and headphone cue are not available for YouTube audio. Double-click the BPM to set it for SYNC.');
     this.display = h(
       'div',
       { class: 'deck-display' },
       h('div', { class: 'disp-row' }, h('div', { class: 'deck-num' }, String(this.i + 1)), h('div', { class: 'disp-text' }, this.title, this.sub)),
       h('div', { class: 'disp-row disp-nums' }, this.time, h('div', { class: 'disp-bpm-wrap' }, this.bpmEl, h('span', { class: 'unit' }, 'BPM')), this.tempoEl, this.flags),
-      this.overview
+      this.overview,
+      this.ytBox,
+      this.ytNote
     );
     this.display.addEventListener('dragover', (e) => {
       e.preventDefault();
@@ -82,6 +87,10 @@ export class DeckUI {
       const trackId = e.dataTransfer.getData('text/ravmix-track');
       if (trackId) this.onLoadRequest?.(trackId);
       else if (e.dataTransfer.files[0]) this.onFileDrop?.(e.dataTransfer.files[0]);
+      else {
+        const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+        if (url) this.onLinkDrop?.(url);
+      }
     });
 
     // ----- Loop section -----
@@ -329,7 +338,10 @@ export class DeckUI {
     });
     this.tempo.set(d.tempoValue, false);
     this.tempoRangeEl.textContent = TEMPO_RANGES[d.tempoRangeIdx] >= 1 ? 'WIDE' : `±${Math.round(TEMPO_RANGES[d.tempoRangeIdx] * 100)}%`;
-    if (d.track) {
+    this.display.classList.toggle('is-yt', d.isYT);
+    if (d.track?.loading) {
+      this.title.textContent = `Loading ${d.track.title}…`;
+    } else if (d.track) {
       this.title.textContent = d.track.title;
       this.sub.textContent = d.track.artist || d.track.fileName;
     }
@@ -338,6 +350,7 @@ export class DeckUI {
     if (d.keyShift) flags.push(`<b class="f-key">KEY ${d.keyShift > 0 ? '+' : ''}${d.keyShift}</b>`);
     if (d.synced) flags.push('<b class="f-sync">SYNC</b>');
     if (d.loop.active) flags.push('<b class="f-loop">LOOP</b>');
+    if (d.isYT) flags.push('<b class="f-yt">YOUTUBE</b>');
     if (this.engine.quantize) flags.push('<b class="f-q">Q</b>');
     this.flags.innerHTML = flags.join('');
     this.renderPads();
@@ -351,7 +364,8 @@ export class DeckUI {
     this.time.textContent = this.showRemain ? fmtTime(d.duration - pos, true) : fmtTime(pos);
     this.time.classList.toggle('warn', d.duration - pos < 30 && d.playing);
     this.bpmEl.textContent = d.bpm ? d.effectiveBpm.toFixed(2) : '---.--';
-    const pct = (d.rate - 1) * 100;
+    d.tick();
+    const pct = ((d.isYT ? d.yt.actualRate : d.rate) - 1) * 100;
     this.tempoEl.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
     if (d.synced) this.tempo.set(d.tempoValue, false);
     if (d.padMode === 'sampler') this.renderPads();

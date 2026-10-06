@@ -3,6 +3,7 @@
 import { h } from './controls.js';
 import { analyzeTrack } from '../audio/analysis.js';
 import { fmtTime } from './deck-ui.js';
+import { parseYouTubeId, fetchYouTubeTitle } from '../audio/youtube.js';
 
 let nextId = 1;
 const AUDIO_EXT = /\.(mp3|wav|m4a|aac|ogg|oga|flac|opus|webm|aiff?|mp4)$/i;
@@ -35,14 +36,24 @@ export class Library {
       'div',
       { class: 'lib-empty' },
       h('div', { class: 'lib-empty-icon' }, '♫'),
-      h('div', {}, 'Drop songs here or click ', h('b', {}, '+ ADD SONGS')),
+      h('div', {}, 'Drop songs here, click ', h('b', {}, '+ ADD SONGS'), ' or paste a YouTube link'),
       h('div', { class: 'mini' }, 'MP3 · WAV · M4A · FLAC · OGG — files never leave your computer')
     );
     const addBtn = h('button', { class: 'btn small add', type: 'button', onClick: () => this.input.click() }, '+ ADD SONGS');
+    this.ytInput = h('input', { class: 'yt-input', type: 'url', placeholder: 'Paste a YouTube link…', 'aria-label': 'YouTube link' });
+    const ytAdd = () => {
+      const t = this.addYouTube(this.ytInput.value);
+      if (t) this.ytInput.value = '';
+      else this.ytInput.classList.add('bad');
+    };
+    this.ytInput.addEventListener('keydown', (e) => e.key === 'Enter' && ytAdd());
+    this.ytInput.addEventListener('input', () => this.ytInput.classList.remove('bad'));
+    const ytBtn = h('button', { class: 'btn small yt-add', type: 'button', onClick: ytAdd }, '▶ ADD YOUTUBE');
+    const ytForm = h('div', { class: 'yt-form' }, this.ytInput, ytBtn);
     this.el = h(
       'section',
       { class: 'library' },
-      h('div', { class: 'lib-head' }, h('div', { class: 'sec-label' }, 'COLLECTION'), addBtn, this.input),
+      h('div', { class: 'lib-head' }, h('div', { class: 'sec-label' }, 'COLLECTION'), ytForm, addBtn, this.input),
       h(
         'div',
         { class: 'lib-scroll' },
@@ -77,6 +88,26 @@ export class Library {
     if (this.selected < 0 && this.tracks.length) this.selected = 0;
     this.render();
     return added;
+  }
+
+  /** Adds a YouTube link as a track. Returns the track, or null if the link isn't a YouTube video. */
+  addYouTube(url) {
+    const videoId = parseYouTubeId(url);
+    if (!videoId) return null;
+    const t = {
+      id: nextId++, kind: 'youtube', videoId, fileName: url.trim(), title: `YouTube · ${videoId}`, artist: 'YouTube',
+      bpm: 0, firstBeat: 0, wave: null, duration: 0, status: 'ready',
+    };
+    this.tracks.push(t);
+    if (this.selected < 0) this.selected = 0;
+    this.render();
+    fetchYouTubeTitle(videoId).then((meta) => {
+      if (!meta) return;
+      t.title = meta.title;
+      t.artist = meta.artist || 'YouTube';
+      this.render();
+    });
+    return t;
   }
 
   async decode(t) {
@@ -116,6 +147,7 @@ export class Library {
 
   /** Decodes the track again (only loaded decks keep audio in memory) */
   async prepare(t) {
+    if (t.kind === 'youtube') return t;
     await this.waitReady(t);
     if (t.status === 'error') throw new Error(`Could not decode ${t.fileName}`);
     const buffer = await this.decode(t);
@@ -148,7 +180,8 @@ export class Library {
     this.tbody.replaceChildren(
       ...this.tracks.map((t, i) => {
         const status =
-          t.status === 'ready' ? (t.bpm ? t.bpm.toFixed(2) : '—') : t.status === 'error' ? h('span', { class: 'err' }, 'error') : h('span', { class: 'spin' }, 'analysing…');
+          t.kind === 'youtube' && !t.bpm ? h('span', { class: 'yt-badge' }, 'YT')
+          : t.status === 'ready' ? (t.bpm ? t.bpm.toFixed(2) : '—') : t.status === 'error' ? h('span', { class: 'err' }, 'error') : h('span', { class: 'spin' }, 'analysing…');
         const onDeck = (this.loaded || []).map((id, d) => (id === t.id ? d + 1 : null)).filter(Boolean);
         const tr = h(
           'tr',

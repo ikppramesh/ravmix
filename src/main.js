@@ -51,6 +51,10 @@ function start() {
     try {
       const prepared = await library.prepare(t);
       await deck.load(prepared);
+      if (t.kind === 'youtube' && deck.track) {
+        t.title = deck.track.title;
+        t.artist = deck.track.artist;
+      }
       library.markLoaded(d, t.id);
     } catch (err) {
       alert(err.message);
@@ -60,6 +64,10 @@ function start() {
 
   deckUIs.forEach((dui, d) => {
     dui.onLoadRequest = (id) => loadToDeck(d, library.find(id));
+    dui.onLinkDrop = (url) => {
+      const t = library.addYouTube(url);
+      if (t) loadToDeck(d, t);
+    };
     dui.onFileDrop = (file) => {
       const [t] = library.addFiles([file]);
       if (t) loadToDeck(d, t);
@@ -298,6 +306,7 @@ function start() {
     waves.forEach((w) => w.draw());
     overviews.forEach((o) => o.draw());
     mixer.frame();
+    engine.syncExternalVolumes();
     midi.syncLeds();
     recTime.textContent = engine.recorder ? ` ${fmtTime((performance.now() - engine.recStart) / 1000).slice(0, 5)}` : '';
     requestAnimationFrame(frame);
