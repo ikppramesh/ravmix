@@ -78,6 +78,10 @@ export class YouTubeSource {
     this.host.replaceChildren(mount);
     await new Promise((resolve, reject) => {
       this.player = new YT.Player(mount, {
+        // Privacy-enhanced host: plays without the viewer's signed-in session, so the decks don't
+        // count against a YouTube Premium/Family plan's concurrent-stream limit
+        // ("Playback paused because there are too many devices streaming on your plan").
+        host: 'https://www.youtube-nocookie.com',
         width: '100%',
         height: '100%',
         videoId,
